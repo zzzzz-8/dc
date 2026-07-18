@@ -1,0 +1,232 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                  String         @id @default(cuid())
+  name                String
+  email               String         @unique
+  password            String
+  phone               String?
+  avatar              String?
+  role                String         @default("STUDENT")
+  membership          String         @default("FREE")
+  membershipExpiry    DateTime?
+  credits             Int            @default(0)
+  dailyGoal           Int            @default(15)
+  reviewTime          String?
+  pronunciationPref   String         @default("US")
+  cachedTotalWords    Int            @default(0)
+  cachedLearnedWords  Int            @default(0)
+  cachedMasteredWords Int            @default(0)
+  cachedErrorCount    Int            @default(0)
+  studyStreak         Int            @default(0)
+  lastStudyDate       DateTime?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  deletedAt           DateTime?
+  userWords           UserWord[]
+  dailyRecords        DailyRecord[]
+  vocabularyTests     VocabularyTest[]
+  customWordbooks     Wordbook[]     @relation("CustomWordbooks")
+  coursewares         Courseware[]
+  referralRecords     ReferralRecord[]
+  schedules           Schedule[]     @relation("TeacherSchedules")
+  studentAccounts     StudentAccount[] @relation("TeacherStudents")
+  userWordbooks       UserWordbook[]
+
+  @@map("users")
+}
+
+model StudentAccount {
+  id              String     @id @default(cuid())
+  name            String
+  account         String     @unique
+  password        String
+  phone           String?
+  wordbookId      String?
+  reviewCount     Int        @default(0)
+  remainingHours  Float      @default(0)
+  note            String?
+  teacherId       String
+  teacher         User       @relation("TeacherStudents", fields: [teacherId], references: [id])
+  schedules       Schedule[]
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  @@map("student_accounts")
+}
+
+model Wordbook {
+  id              String        @id @default(cuid())
+  name            String
+  cover           String?
+  grade           String?
+  publisher       String?
+  level           String        @default("CUSTOM")
+  totalWords      Int           @default(0)
+  isPublic        Boolean       @default(true)
+  downloadCount   Int           @default(0)
+  isCustom        Boolean       @default(false)
+  authorId        String?
+  author          User?         @relation("CustomWordbooks", fields: [authorId], references: [id])
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  words           Word[]
+  userBook        UserWordbook[]
+
+  @@map("wordbooks")
+}
+
+model Word {
+  id              String     @id @default(cuid())
+  word            String
+  phonetic        String?
+  phoneticUS      String?
+  phoneticUK      String?
+  meaning         String
+  partOfSpeech    String?
+  example         String?
+  exampleTrans    String?
+  rootAffix       String?
+  difficulty      Int        @default(1)
+  examLevel       String?
+  wordbookId      String
+  wordbook        Wordbook   @relation(fields: [wordbookId], references: [id], onDelete: Cascade)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  userWords       UserWord[]
+
+  @@unique([wordbookId, word])
+  @@map("words")
+}
+
+model UserWord {
+  id                 String     @id @default(cuid())
+  userId             String
+  wordId             String
+  user               User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  word               Word       @relation(fields: [wordId], references: [id], onDelete: Cascade)
+  status             String     @default("NEW")
+  stage              Int        @default(0)
+  errorCount         Int        @default(0)
+  correctCount       Int        @default(0)
+  consecutiveCorrect Int        @default(0)
+  firstLearned       DateTime   @default(now())
+  lastReviewAt       DateTime?
+  nextReviewAt       DateTime?
+  isInErrorBook      Boolean    @default(false)
+  isCollected        Boolean    @default(false)
+  note               String?
+  noteUpdatedAt      DateTime?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  @@unique([userId, wordId])
+  @@index([userId, status])
+  @@index([userId, nextReviewAt])
+  @@map("user_words")
+}
+
+model UserWordbook {
+  id              String   @id @default(cuid())
+  userId          String
+  wordbookId      String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wordbook        Wordbook @relation(fields: [wordbookId], references: [id], onDelete: Cascade)
+  learnedCount    Int      @default(0)
+  masteredCount   Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([userId, wordbookId])
+  @@map("user_wordbooks")
+}
+
+model DailyRecord {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date            DateTime
+  newWords        Int      @default(0)
+  reviewedWords   Int      @default(0)
+  totalWords      Int      @default(0)
+  errorWords      Int      @default(0)
+  masteredWords   Int      @default(0)
+  wordbookId      String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([userId, date])
+  @@index([userId, date])
+  @@map("daily_records")
+}
+
+model VocabularyTest {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  score           Int
+  total           Int      @default(60)
+  vocabulary      Int
+  level           String
+  levelLabel      String
+  answers         String?
+  timeUsed        Int?
+  testedAt        DateTime @default(now())
+
+  @@index([userId, testedAt])
+  @@map("vocabulary_tests")
+}
+
+model Courseware {
+  id              String   @id @default(cuid())
+  name            String
+  label           String
+  fileUrl         String
+  fileType        String
+  fileSize        Int?
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("coursewares")
+}
+
+model Schedule {
+  id              String          @id @default(cuid())
+  teacherId       String
+  teacher         User            @relation("TeacherSchedules", fields: [teacherId], references: [id])
+  studentId       String
+  student         StudentAccount  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  date            DateTime
+  duration        Int
+  content         String?
+  status          String          @default("PENDING")
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([teacherId, date])
+  @@index([studentId, date])
+  @@map("schedules")
+}
+
+model ReferralRecord {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type            String
+  commission      Int
+  status          String   @default("PENDING")
+  note            String?
+  createdAt       DateTime @default(now())
+  settledAt       DateTime?
+
+  @@map("referral_records")
+}
